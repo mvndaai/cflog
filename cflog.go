@@ -1,4 +1,4 @@
-package cflogging
+package cflog
 
 import (
 	"context"
