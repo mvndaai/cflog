@@ -2,11 +2,14 @@ package cflogging
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
+	"strings"
 
 	"cloud.google.com/go/logging/apiv2"
-
+	_struct "github.com/golang/protobuf/ptypes/struct"
+	"github.com/micro/protobuf/jsonpb"
 	"google.golang.org/genproto/googleapis/api/monitoredres"
 	"google.golang.org/genproto/googleapis/logging/type"
 	loggingpb "google.golang.org/genproto/googleapis/logging/v2"
@@ -36,7 +39,8 @@ type Client struct {
 	logMonitoredResource *monitoredres.MonitoredResource
 }
 
-// NewClient creates a client for writing logs
+// NewClient creates a client for writing logs using environment variable
+// https://cloud.google.com/functions/docs/env-var
 func NewClient(ctx context.Context) (Client, error) {
 	c := Client{}
 	client, err := logging.NewClient(ctx)
@@ -74,15 +78,25 @@ func (c Client) Log(ctx context.Context, severity Severity, payload interface{})
 
 	switch v := payload.(type) {
 	case string:
-		entry.Payload = &loggingpb.LogEntry_TextPayload{TextPayload: v}
+		if strings.HasPrefix("{", v) && strings.HasSuffix("}", v) {
+			var payload _struct.Struct
+			if err := jsonpb.UnmarshalString(v, &payload); err != nil {
+				return err
+			}
+			entry.Payload = &loggingpb.LogEntry_JsonPayload{JsonPayload: &payload}
+		} else {
+			entry.Payload = &loggingpb.LogEntry_TextPayload{TextPayload: v}
+		}
 	default:
-		return fmt.Errorf("We do not yet know how to convert a struct")
-
-		// if err := jsonpb.UnmarshalString(json, &payload); err != nil {
-		// 	return err
-		// }
-
-		// entry.Payload = &loggingpb.LogEntry_JsonPayload{JsonPayload: &v}
+		data, err := json.Marshal(v)
+		if err != nil {
+			return err
+		}
+		var payload _struct.Struct
+		if err := jsonpb.UnmarshalString(string(data), &payload); err != nil {
+			return err
+		}
+		entry.Payload = &loggingpb.LogEntry_JsonPayload{JsonPayload: &payload}
 	}
 
 	req := &loggingpb.WriteLogEntriesRequest{
