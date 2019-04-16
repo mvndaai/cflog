@@ -78,7 +78,7 @@ func (c Client) Log(ctx context.Context, severity Severity, payload interface{})
 
 	switch v := payload.(type) {
 	case string:
-		if strings.HasPrefix("{", v) && strings.HasSuffix("}", v) {
+		if strings.HasPrefix(`"{`, v) && strings.HasSuffix(`}"`, v) {
 			var payload _struct.Struct
 			if err := jsonpb.UnmarshalString(v, &payload); err != nil {
 				return err
