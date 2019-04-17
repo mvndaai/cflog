@@ -1,3 +1,4 @@
+// A package to help with logging in GCP Cloud Functions
 package cflog
 
 import (
@@ -68,7 +69,7 @@ func (c Client) Close() error {
 	return c.client.Close()
 }
 
-func setEntrypayload(entry *loggingpb.LogEntry, in interface{}) error {
+func setEntryPayload(entry *loggingpb.LogEntry, in interface{}) error {
 	var s string
 	switch v := in.(type) {
 	case string:
@@ -101,12 +102,13 @@ func setEntrypayload(entry *loggingpb.LogEntry, in interface{}) error {
 // Log creates a log using the payload given
 // Payload should be either a string or a struct that can marshal to JSON
 func (c Client) Log(ctx context.Context, severity Severity, payload interface{}) error {
+	// https://cloud.google.com/logging/docs/reference/v2/rest/v2/LogEntry
 	entry := &loggingpb.LogEntry{
 		LogName:  c.logName,
 		Resource: c.logMonitoredResource,
 		Severity: ltype.LogSeverity(severity),
 	}
-	if err := setEntrypayload(entry, payload); err != nil {
+	if err := setEntryPayload(entry, payload); err != nil {
 		return err
 	}
 

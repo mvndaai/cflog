@@ -30,7 +30,7 @@ func TestSetEntrypayload(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			entry := &loggingpb.LogEntry{}
-			if err := setEntrypayload(entry, test.input); err != nil {
+			if err := setEntryPayload(entry, test.input); err != nil {
 				t.Fatal("Set error", err)
 			}
 
