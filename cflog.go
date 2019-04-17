@@ -68,6 +68,36 @@ func (c Client) Close() error {
 	return c.client.Close()
 }
 
+func setEntrypayload(entry *loggingpb.LogEntry, in interface{}) error {
+	var s string
+	switch v := in.(type) {
+	case string:
+		s = v
+	case []byte:
+		s = string(v)
+	default:
+		if v == nil {
+			break
+		}
+		data, err := json.Marshal(v)
+		if err != nil {
+			return err
+		}
+		s = string(data)
+	}
+
+	if strings.HasPrefix(s, "{") && strings.HasSuffix(s, "}") {
+		var payload _struct.Struct
+		if err := jsonpb.UnmarshalString(s, &payload); err == nil {
+			entry.Payload = &loggingpb.LogEntry_JsonPayload{JsonPayload: &payload}
+			return nil
+		}
+	}
+
+	entry.Payload = &loggingpb.LogEntry_TextPayload{TextPayload: s}
+	return nil
+}
+
 // Log creates a log using the payload given
 // Payload should be either a string or a struct that can marshal to JSON
 func (c Client) Log(ctx context.Context, severity Severity, payload interface{}) error {
@@ -76,33 +106,11 @@ func (c Client) Log(ctx context.Context, severity Severity, payload interface{})
 		Resource: c.logMonitoredResource,
 		Severity: ltype.LogSeverity(severity),
 	}
-
-	switch v := payload.(type) {
-	case string:
-		if strings.HasPrefix(`"{`, v) && strings.HasSuffix(`}"`, v) {
-			var payload _struct.Struct
-			if err := jsonpb.UnmarshalString(v, &payload); err != nil {
-				return err
-			}
-			entry.Payload = &loggingpb.LogEntry_JsonPayload{JsonPayload: &payload}
-		} else {
-			entry.Payload = &loggingpb.LogEntry_TextPayload{TextPayload: v}
-		}
-	default:
-		data, err := json.Marshal(v)
-		if err != nil {
-			return err
-		}
-		var payload _struct.Struct
-		if err := jsonpb.UnmarshalString(string(data), &payload); err != nil {
-			return err
-		}
-		entry.Payload = &loggingpb.LogEntry_JsonPayload{JsonPayload: &payload}
+	if err := setEntrypayload(entry, payload); err != nil {
+		return err
 	}
 
-	req := &loggingpb.WriteLogEntriesRequest{
-		Entries: []*loggingpb.LogEntry{entry},
-	}
+	req := &loggingpb.WriteLogEntriesRequest{Entries: []*loggingpb.LogEntry{entry}}
 	if _, err := c.client.WriteLogEntries(ctx, req); err != nil {
 		return err
 	}
