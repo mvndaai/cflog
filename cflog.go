@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"os"
 	"strings"
 
@@ -107,3 +108,36 @@ func (c Client) Log(ctx context.Context, severity Severity, payload interface{})
 	}
 	return nil
 }
+
+var singleton Client
+
+// Log uses an auto generated singleton client
+func Log(ctx context.Context, severity Severity, payload interface{}) {
+	if singleton.client == nil {
+		var err error
+		singleton, err = NewClient(context.Background())
+		if err != nil {
+			log.Printf("Could not create client to log payload '%q': %v", payload, err)
+			return
+		}
+	}
+
+	if err := singleton.Log(ctx, severity, payload); err != nil {
+		log.Printf("Could not log payload '%q': %v", payload, err)
+	}
+}
+
+// Debug calls Log with the severity set to Debug
+func Debug(ctx context.Context, payload interface{}) { Log(ctx, SeverityDebug, payload) }
+
+// Info calls Log with the severity set to Info
+func Info(ctx context.Context, payload interface{}) { Log(ctx, SeverityInfo, payload) }
+
+// Warn calls Log with the severity set to Warning
+func Warn(ctx context.Context, payload interface{}) { Log(ctx, SeverityWarning, payload) }
+
+// Error calls Log with the severity set to Error
+func Error(ctx context.Context, payload interface{}) { Log(ctx, SeverityError, payload) }
+
+// Critical calls Log with the severity set to Critical
+func Critical(ctx context.Context, payload interface{}) { Log(ctx, SeverityCritical, payload) }
